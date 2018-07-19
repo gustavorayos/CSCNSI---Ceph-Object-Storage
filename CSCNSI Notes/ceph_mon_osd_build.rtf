@@ -1,0 +1,97 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1187\cocoasubrtf400
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fmodern\fcharset0 Courier;}
+{\colortbl;\red255\green255\blue255;}
+\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\fs24 \cf0 ceph build --- only after the initial install is done\
+\
+monitor\
+----------\
+start here!\
+\
+ssh ceph-mon\
+\
+ls /etc/ceph ---make sure it exists\
+\
+touch /etc/ceph/ceph.conf\
+\
+uuidgen\
+\
+ceph-authtool --create-keyring /tmp/ceph.mon.keyring --gen-key -n mon. --cap mon 'allow *'\
+\
+ceph-authtool --create-keyring /etc/ceph/ceph.client.admin.keyring --gen-key -n client.admin --set-uid=0 --cap mon 'allow *' --cap osd 'allow *' --cap mds 'allow'\
+\
+ceph-authtool /tmp/ceph.mon.keyring --import-keyring /etc/ceph/ceph.client.admin.keyring\
+\
+monmaptool --create --add ceph-mon 192.168.10.2 --fsid e1628902-fc25-4fa2-88a9-c26e84c2f3bf /tmp/monmap\
+\
+mkdir /var/lib/ceph/mon/ceph-ceph-mon\
+\
+ceph-mon --cluster ceph --mkfs -i ceph-mon --monmap /tmp/monmap --keyring /tmp/ceph.mon.keyring\
+\
+make /etc/ceph/ceph.conf:\
+fsid = e1628902-fc25-4fa2-88a9-c26e84c2f3bf\
+mon initial members = ceph-mon\
+mon host = 192.168.10.2\
+public network = 192.168.10.0/24\
+auth cluster required = cephx\
+auth service required = cephx\
+auth client required = cephx\
+osd journal size = 1024\
+filestore xattr use omap = true\
+osd pool default size = 2\
+osd pool default min size = 1\
+osd pool default pg num = 333\
+osd pool default pgp num = 333\
+osd crush chooseleaf type = 1\
+\
+touch /var/lib/ceph/mon/ceph-ceph-mon/done\
+\
+touch /var/lib/ceph/mon/ceph-ceph-mon/done\
+\
+/etc/init.d/ceph start mon.ceph-mon\
+\
+check status:\
+ceph -s\
+\
+\
+odd build\
+-------------\
+\
+ssh ceph-osd1\
+\
+\pard\pardeftab720
+
+\f1 \cf0 uuidgen\
+\
+scp ceph-mon:/etc/ceph/ceph.conf /etc/ceph\
+scp ceph-mon:/etc/ceph/ceph.client.admin.keyring /etc/ceph/\
+scp ceph-mon:/var/lib/ceph/bootstrap-osd/ceph.keyring /var/lib/ceph/bootstrap-osd/\
+\
+ceph osd create uuid\
+\
+mkdir /var/lib/ceph/osd/\{cluster-name\}-\{osd-number\}\
+\
+mkfs -t \{fstype\} /dev/\{hdd\}\
+mkfs -t \{fstype\} /dev/\{hdd\}\
+\
+#disk per odd, repeat as needed\
+mount -o user_xattr /dev/\{hdd\} /var/lib/ceph/osd/\{cluster-name\}-\{osd-number\}\
+\
+ceph-osd -i \{osd-num\} --mkfs --mkkey --osd-uuid [\{uuid\}]\
+\
+ceph auth add osd.\{osd-num\} osd 'allow *' mon 'allow profile osd' -i /var/lib/ceph/osd/\{cluster-name\}-\{osd-num\}/keyring\
+\
+ceph [--cluster \{cluster-name\}] osd crush add-bucket \{hostname\} host\
+\
+ceph osd crush move node1 root=default\
+\
+ceph [--cluster \{cluster-name\}] osd crush add \{id-or-name\} \{weight\} [\{bucket-type\}=\{bucket-name\} ...]\
+ex. ceph osd crush add osd.0 1.0 host=node1\
+\
+touch /var/lib/ceph/osd/\{cluster-name\}-\{osd-num\}/sysvinit\
+\
+/etc/init.d/ceph start osd.\{osd-num\}\
+\
+}
